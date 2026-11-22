@@ -39,3 +39,38 @@ My own rule gave Claude the Node.js version, so my workflow already used `node-v
   - Lines 27–28 – Run tests: Runs the Playwright test suite.
   - Lines 30–32 – Keep the HTML report: Uploads the test report to GitHub, even if the tests fail (unless the workflow is cancelled).
   - Lines 33–36 – Report settings: Names the report playwright-report and keeps it for 30 days.
+
+## 5. The first run on GitHub
+- **Run:** Add the CI workflow · **Result:** green · **Tests:** 21 passed
+- **The report (artifact):** yes, playwright-report is under Artifacts
+
+## 6. A red run on purpose
+- **The change:** `tests/example.spec.ts` line 6, `toBe(200)` → `toBe(201)`
+- **My prediction:** The Run the Playwright tests step will turn red because the test expects status code 201, but GET /api/tags should return 200 (OK), not 201 (Created). The status-code assertion on line 6 will fail.
+- **What GitHub showed:** 1) [chromium] › tests/example.spec.ts:3:5 › the API lists the popular tags · Expected: 201 · Received: 200 · 1 failed, 20 passed
+
+## 7. Fixed, and green again
+- **The fix:** line 6 back to `toBe(200)` · **Run:** Fix the expected status · **Result:** 21 passed green
+
+## 8. Review notes for my other AI-written tests (written while CI ran)
+The API checklist: status · body · shape · negative cases (a refused request changes nothing) · own test data.
+Monday's and Tuesday's tests that I did not review in depth on those days. Each one: kept, changed or removed, and why.
+
+### Monday: `tests/api.spec.ts`
+- "read: anyone can get an article by its slug and gets 200 with the saved values": **changed**, because it checks the saved values, but should also verify the exact response fields and data types.
+- "delete: the author deletes an article, gets 204 with no body, and the article is gone": **kept**, because it checks 204, empty response body, and 404 after deletion.
+- "create without a token gives 401 "token is missing" and saves nothing": **changed**, because checking only the newest 100 articles may not prove that nothing was saved. Verify the exact test article was not created.
+- "read an article that does not exist gives 404 "article not found"": **kept**, because it checks the expected 404 status and error message.
+- "change by a user who is not the author gives 403 and the article stays the same": **kept**, because it checks 403 and confirms the article body remains unchanged.
+- "delete by a user who is not the author gives 403 and the article still exists": **kept**, because it checks 403 and confirms the article still exists.
+- "delete with a wrong token gives 401 "token is invalid" and the article still exists": **changed**, because GET checks only status 200. Also verify the article's saved values remain unchanged.
+
+My overall rule: Keep tests that verify the expected result. Improve tests that do not fully verify the response or saved data. Ensure tests use their own test data.
+
+### Tuesday: `tests/contract.spec.ts`
+- "GET /api/user answers with the User shape": **kept**, because it checks status, field types, exact keys, and the signed-in user's email and username.
+- "GET /api/user without a token answers 401 "is missing"": **kept**, because it checks 401, exact error keys, and the expected error message.
+- "GET /api/user with a wrong token answers 401 "is invalid"": **kept**, because it checks 401, exact error keys, and the expected invalid-token message.
+- "PUT /api/articles/:slug on someone else's article answers 403 and changes nothing": **changed**, because it checks 403, but after the request it verifies only the title. It should also verify that the other article's remaining saved values are unchanged.
+
+Overall: The first three tests are strong. Test 4 needs a stronger check to confirm that the refused request did not change the article.
